@@ -1,0 +1,12 @@
+export { default as CamOff } from "./CamOff";
+export { default as CamOn } from "./CamOn";
+export { default as LogoApp } from "./LogoApp";
+export { default as LogoHero } from "./LogoHero";
+export { default as MicroOff } from "./MicroOff";
+export { default as MicroOn } from "./MicroOn";
+export { default as Next } from "./Next";
+export { default as Send } from "./Send";
+export { default as TelaOff } from "./TelaOff";
+export { default as TelaOn } from "./TelaOn";
+export { default as Telef } from "./Telef";
+export { default as Vercel } from "./Vercel";
