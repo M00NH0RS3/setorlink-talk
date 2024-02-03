@@ -3,6 +3,7 @@ import Chat from "@/components/Chat";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import { SocketContext } from "@/context/SocketContext";
+import { useRouter } from "next/navigation";
 import { useContext, useEffect, useRef, useState } from "react";
 interface IAnswer {
     sender: string;
@@ -12,13 +13,18 @@ interface ICandidate {
     sender: string;
     candidate: RTCIceCandidate;
 }
+interface IDataStream {
+    id: string;
+    stream: MediaStream;
+}
 
 export default function Room({ params }: { params: { id: string } }) {
     const { socket } = useContext(SocketContext);
     const localStream = useRef<HTMLVideoElement>(null);
+    const router = useRouter();
     const peerConnections = useRef<Record<string, RTCPeerConnection>>({});
-    const [remoteStreams, setRemoteStreams] = useState<MediaStream[]>([]);
-    const [videoMediaStream, setVideoMediaStream] = useState<MediaStream | null>(null);
+    const [remoteStreams, setRemoteStreams] = useState<IDataStream[]>([]);
+    const [videoMediaStream, setVideoMediaStream] = useState<MediaStream | null>(null,);
     console.log('remote stream', remoteStreams)
     useEffect(() => {
         socket?.on('connect', async () => {
@@ -95,8 +101,8 @@ export default function Room({ params }: { params: { id: string } }) {
             });
         } else {
             const video = await initRemoteCamera();
-            video.getTracks().forEach((track) => 
-            peerConnection.addTrack(track, video));
+            video.getTracks().forEach((track) =>
+                peerConnection.addTrack(track, video));
 
         }
 
@@ -116,23 +122,59 @@ export default function Room({ params }: { params: { id: string } }) {
         peerConnection.ontrack = (event) => {
             const remoteStream = event.streams[0];
 
-            // const dataStream = {
-            //     id: socketId,
-            //     stream: remoteStream,
-            // };
+            const dataStream: IDataStream = {
+                id: socketId,
+                stream: remoteStream,
+            };
 
-            setRemoteStreams([...remoteStreams, remoteStream]);
+            setRemoteStreams((prevState: IDataStream[]) => {
+                if(!prevState.some(stream=>stream.id === socketId)){
+                    return [... prevState, dataStream]
+                }
+                return prevState
+            });
         }
 
-        peer.onicecandidate = (event) => {
+        peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
                 socket?.emit('ice candidates', {
                     to: socketId,
                     sender: socket?.id,
-                    candidate: event.candidate.candidate,
+                    candidate: event.candidate,
                 });
             };
         };
+        peerConnection.onsignalingstatechange = (event) => {
+            switch (peerConnection.signalingState) {
+                case 'closed':
+                    setRemoteStreams((prevState) => prevState.filter((stream) => stream.id !== socketId));
+                    break;
+            }
+        };
+        peerConnection.onconnectionstatechange = (event) => {
+            switch (peerConnection.connectionState) {
+                case 'disconnected':
+                    setRemoteStreams((prevState) => prevState.filter((stream) => stream.id !== socketId));
+                case 'failed':
+                    setRemoteStreams((prevState) => prevState.filter((stream) => stream.id !== socketId));
+                case 'closed':
+                    setRemoteStreams((prevState) => prevState.filter((stream) => stream.id !== socketId));
+                    break;
+            }
+        }
+    };
+
+    const logout = () => {
+        videoMediaStream?.getTracks().forEach((track) => {
+            track.stop();
+        });
+
+        Object.values(peerConnections.current).forEach((peerConnections) => {
+            peerConnections.close();
+        });
+        socket?.disconnect();
+        router.push('/');
+
     };
 
     const initLocalCamera = async () => {
@@ -171,7 +213,7 @@ export default function Room({ params }: { params: { id: string } }) {
                             return (
                                 <div className="bg-gray-950 w-full rounded-md h-full p-2 relative" key={index}>
                                     <video className="h-full" autoPlay ref={(video) => {
-                                        if (video && video.srcObject !== stream) video.srcObject = stream;
+                                        if (video && video.srcObject !== stream.stream) video.srcObject = stream.stream;
                                     }} />
                                     <span className="absolute bottom-3">Ana Luisa</span>
                                 </div>
@@ -182,7 +224,11 @@ export default function Room({ params }: { params: { id: string } }) {
                 </div>
                 <Chat roomId={params.id} />
             </div>
-            <Footer />
+            <Footer videoMediaStream={videoMediaStream!}
+                peerConnections={peerConnections}
+                localStream={localStream}
+                logout={logout}
+            />
         </div>
     );
 };
