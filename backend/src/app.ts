@@ -20,24 +20,42 @@ class App {
         });
     }
 
-    public listenSocket(){
+    public listenSocket() {
         this.io.of('/streams').on('connection', this.socketEvents)
     }
-    private socketEvents(socket: Socket){
+    private socketEvents(socket: Socket) {
         console.log('Socket connected:' + socket.id);
-        socket.on('subscribe', (data)=> {
+        socket.on('subscribe', (data) => {
             console.log('usuario inserido na sala' + data.roomId)
-            socket.join(data.roomId)
+            socket.join(data.roomId);
+            socket.join(data.socketId);
 
-            socket.on('chat', (data)=> {
-                console.log('🚀 ~ App ~ socket.io ~ data:', data); 
-                socket.broadcast.to(data.roomId).emit('chat', {
-                    message: data.message,
+            const roomsSession = Array.from(socket.rooms)
+
+            if (roomsSession.length > 1) {
+                socket.to(data.roomId).emit('new user', {
+                    socketId: socket.id,
                     username: data.username,
-                    time: data.time,
                 });
-            })
+            };
+        });
 
+        socket.on('newUserStart', data => {
+            console.log('Novo usuario chegou', data);
+            socket.to(data.to).emit('newUserStart', {
+                sender: data.sender,
+            });
+        });
+
+        socket.on('sdp', data => {
+            socket.to(data.to).emit('sdp', {
+                description: data.description,
+                sender: data.sender,
+            });
+        });
+
+        socket.on('chat', (data) => {
+            console.log('🚀 ~ App ~ socket.io ~ data:', data);
             socket.broadcast.to(data.roomId).emit('chat', {
                 message: data.message,
                 username: data.username,
