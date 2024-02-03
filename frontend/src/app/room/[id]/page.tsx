@@ -8,9 +8,9 @@ interface IAnswer {
     sender: string;
     description: RTCSessionDescriptionInit;
 };
-interface ICandidates {
+interface ICandidate {
+    sender: string;
     candidate: RTCIceCandidate;
-    sender: string
 }
 
 export default function Room({ params }: { params: { id: string } }) {
@@ -49,7 +49,7 @@ export default function Room({ params }: { params: { id: string } }) {
         socket?.on('sdp', (data) => handleAnswer(data));
     }, [socket]);
 
-    const handleIceCandidates = async (data: ICandidates) => {
+    const handleIceCandidates = async (data: ICandidate) => {
         const peerConnection = peerConnections.current[data.sender];
         if (data.candidate) {
             await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
